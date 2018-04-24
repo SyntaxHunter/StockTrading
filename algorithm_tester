@@ -4,7 +4,7 @@ fileNames = listdir('stock_folder')
 stocks = {}
 for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
-    stock = csv.reader(open('stock_folder' + fileName, 'r'))
+    stock = csv.reader(open('stock_folder/' + fileName, 'r'))
     priceList = []
 
     for day in stock:
