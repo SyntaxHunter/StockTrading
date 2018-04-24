@@ -1,4 +1,4 @@
-import csv
+import csv, copy
 from os import listdir
 fileNames = listdir('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily')
 stocks = {}
@@ -6,31 +6,43 @@ for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
     stock = csv.reader(open('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily/' + fileName, 'r'))
     priceList = []
+
     for day in stock:
         priceList.append(float(day[2]))
+        stocks[ticker] = priceList
         
-    stocks[ticker] = priceList
 
+deleteList = []
+
+for stock in stocks:
+    if len(stocks[stock]) < 3926:
+        deleteList.append(stock)
+
+for stock in deleteList:
+    del stocks[stock]
+    
+print(len(deleteList))
 
 def main():
+
     print("Buy and hold ROI: ", runStrat(buyAndHold))
-    print("Moving average strategy ROI: ", runStrat(movingAverage))
+    #print("Moving average strategy ROI: ", runStrat(movingAverage))
   
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
 def runStrat(strat):
     uninvested = 100_000
     invested = dict.fromkeys(list(stocks.keys()), 0)
-    for day in range(1000, 2000):
+    for day in range(0, 3000):
         buysAndSells = strat(day, invested, uninvested)
         
         for stock in invested:
-            invested[stock] = invested[stock] * stocks[stock][day + 1] / stocks[stock][day]  #changes stock value
+            invested[stock] = invested[stock] * stocks[stock][day] / stocks[stock][day - 1]  #changes stock value
             invested[stock] = invested[stock] + buysAndSells[stock] #buys and sells
         uninvested = uninvested - sum(buysAndSells.values())
         
         #print("invested: $", invested," Uninvested: $", uninvested)
 
-    return sum(invested.values(), uninvested) +  / 100_000
+    return sum(invested.values(), uninvested) / 100_000
 
 
 ##Keeps the portion of total funds invested proportional to the ratio between the 200 day
@@ -47,14 +59,21 @@ def movingAverage(day, invested, uninvested):
     
 ##Distributes capital equally among all stocks                    
 def buyAndHold(day, invested, uninvested):
-    return uninvested
+        buysAndSells = copy.deepcopy(invested)
+        for stock in buysAndSells:
+            buysAndSells[stock] = uninvested / len(buysAndSells)
+
+        return buysAndSells        
+
+    
+        
 
 def getAverage(day, interval):
     if day - interval / 2 < 0:
         print("Error: surrounding data not sufficient to calculate an average over this interval.")
         return None
     total = 0
-    for i in range(day - interval // 2, day + interval // 2):
+    for i in range(day - interval, day):
         total = total + aapl_list[i]
     return total / interval
 
