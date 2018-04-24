@@ -1,13 +1,20 @@
 import csv, copy
 from os import listdir
 fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
+START_DATE = 19980102
+STOCK_CHECK_INTERVAL = 30
 stocks = {}
 validStocks = {}
 invalidStocks = {}
 stockStartDates = {}
+dayList = []
 for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
     stock = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r'))
+    if ticker=="aapl":
+        for row in stock:
+            dayList.append(int(row[0]))
+        stockStartDates[ticker]=dayList[0]
     priceList = []
     for row in stock:
         stockStartDates[ticker] = row[0]
@@ -16,17 +23,6 @@ for fileName in fileNames:
         priceList.append(float(day[2]))
     stocks[ticker] = priceList
     invalidStocks[ticker] = priceList
-        
-"""deleteList = []
-
-for stock in stocks:
-    if len(stocks[stock]) < 3926:
-        deleteList.append(stock)
-
-    
-print(len(deleteList))"""
-print(stockStartDates)
-
 def updateValidStocks(date):
     deleteTickers = []
     for ticker in invalidStocks.keys():
@@ -35,13 +31,8 @@ def updateValidStocks(date):
             deleteTickers.append(ticker)
     for ticker in deleteTickers:
         del invalidStocks[ticker]
-    print(len(validStocks))
-    print(len(invalidStocks))
-    print(len(stocks))
 
-def main(startDate):
-
-    updateValidStocks(startDate)
+def main():
     
     print("Buy and hold ROI: ", runStrat(buyAndHold))
     #print("Moving average strategy ROI: ", runStrat(movingAverage))
@@ -51,6 +42,9 @@ def runStrat(strat):
     uninvested = 100_000
     invested = dict.fromkeys(list(validStocks.keys()), 0)
     for day in range(0, 3000):
+        if day % STOCK_CHECK_INTERVAL == 0:
+            updateValidStocks(dayList[day])
+            print(len(validStocks))
         buysAndSells = strat(day, invested, uninvested)
         
         for stock in invested:
@@ -95,5 +89,5 @@ def getAverage(day, interval):
         total = total + aapl_list[i]
     return total / interval
 
-main(19980102)
+main()
 
