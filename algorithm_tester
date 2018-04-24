@@ -1,10 +1,10 @@
 import csv, copy
 from os import listdir
-fileNames = listdir('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily')
+fileNames = listdir('stock_folder')
 stocks = {}
 for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
-    stock = csv.reader(open('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily/' + fileName, 'r'))
+    stock = csv.reader(open('stock_folder' + fileName, 'r'))
     priceList = []
 
     for day in stock:
