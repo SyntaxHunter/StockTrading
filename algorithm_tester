@@ -1,42 +1,60 @@
 import csv, copy
 from os import listdir
-fileNames = listdir('stock_folder')
+fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
 stocks = {}
+validStocks = {}
+invalidStocks = {}
+stockStartDates = {}
 for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
-    stock = csv.reader(open('stock_folder/' + fileName, 'r'))
+    stock = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r'))
     priceList = []
-
+    for row in stock:
+        stockStartDates[ticker] = row[0]
+        break
     for day in stock:
         priceList.append(float(day[2]))
-        stocks[ticker] = priceList
+    stocks[ticker] = priceList
+    invalidStocks[ticker] = priceList
         
-
-deleteList = []
+"""deleteList = []
 
 for stock in stocks:
     if len(stocks[stock]) < 3926:
         deleteList.append(stock)
 
-for stock in deleteList:
-    del stocks[stock]
     
-print(len(deleteList))
+print(len(deleteList))"""
+print(stockStartDates)
 
-def main():
+def updateValidStocks(date):
+    deleteTickers = []
+    for ticker in invalidStocks.keys():
+        if int(stockStartDates[ticker])<=date:
+            validStocks[ticker]=stocks[ticker]
+            deleteTickers.append(ticker)
+    for ticker in deleteTickers:
+        del invalidStocks[ticker]
+    print(len(validStocks))
+    print(len(invalidStocks))
+    print(len(stocks))
 
+def main(startDate):
+
+    updateValidStocks(startDate)
+    
     print("Buy and hold ROI: ", runStrat(buyAndHold))
     #print("Moving average strategy ROI: ", runStrat(movingAverage))
   
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
 def runStrat(strat):
     uninvested = 100_000
-    invested = dict.fromkeys(list(stocks.keys()), 0)
+    invested = dict.fromkeys(list(validStocks.keys()), 0)
     for day in range(0, 3000):
         buysAndSells = strat(day, invested, uninvested)
         
         for stock in invested:
-            invested[stock] = invested[stock] * stocks[stock][day] / stocks[stock][day - 1]  #changes stock value
+            invested[stock] = invested[stock] * validStocks[stock][day] / validStocks[stock][day - 1]  #changes stock value
             invested[stock] = invested[stock] + buysAndSells[stock] #buys and sells
         uninvested = uninvested - sum(buysAndSells.values())
         
@@ -77,4 +95,5 @@ def getAverage(day, interval):
         total = total + aapl_list[i]
     return total / interval
 
-main()
+main(19980102)
+
