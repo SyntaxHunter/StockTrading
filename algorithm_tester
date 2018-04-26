@@ -80,14 +80,16 @@ def buyAndHold(day, invested, uninvested):
     
         
 
-def getAverage(day, interval):
-    if day - interval / 2 < 0:
-        print("Error: surrounding data not sufficient to calculate an average over this interval.")
+def getAverage(stock, day, interval):
+    if day - interval < 0:
+        print("Error: previous data not sufficient to calculate an average over this interval.")
         return None
     total = 0
     for i in range(day - interval, day):
-        total = total + aapl_list[i]
+        total = total + stocks[stock][i]
     return total / interval
+    
+  
 
 main()
 
