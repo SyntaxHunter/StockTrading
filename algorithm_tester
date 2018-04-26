@@ -79,8 +79,7 @@ def buyAndHold(day, invested, uninvested):
 
     
         
-
-def getAverage(stock, day, interval):
+def SMA(stock, day, interval):
     if day - interval < 0:
         print("Error: previous data not sufficient to calculate an average over this interval.")
         return None
@@ -88,6 +87,16 @@ def getAverage(stock, day, interval):
     for i in range(day - interval, day):
         total = total + stocks[stock][i]
     return total / interval
+
+def EMA(stock, day, interval):
+    if day - interval < 0:
+            print("Not enough previous data.")
+            return None
+    c = 2.0 / (interval + 1)
+    ema = SMA(stock, day - interval, interval)
+    for day in range(day - interval, day):
+        ema = (c * stocks[stock][day]) + ((1 - c) * ema)
+    return ema
     
   
 
