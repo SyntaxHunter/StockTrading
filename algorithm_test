@@ -1,36 +1,74 @@
-import csv
-aapl = open('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily/table_aapl.csv', 'r')
-reader = csv.reader(aapl)
-aapl_list = []
-for row in reader:
-    aapl_list.append(float(row[2]))
-
-##Simulates investment in Apple stock over the 1000 trading days
-
-
+import csv, copy
+from os import listdir
+fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
+START_DATE = 19980102
+STOCK_CHECK_INTERVAL = 30
+stocks = {}
+validStocks = []
+invalidStocks = []
+stockStartDates = {}
+dayList = []
+for fileName in fileNames:
+    ticker = fileName.split('_')[1].split('.')[0]
+    stock = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r'))
+    priceList = []
+    for row in stock:
+        stockStartDates[ticker] = row[0]
+        break
+    for day in stock:
+        priceList.append(float(day[2]))
+    stocks[ticker] = priceList
+    invalidStocks.append(ticker)
+    
+aapl = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/table_aapl.csv', 'r'))
+for row in aapl:
+    dayList.append(int(row[0]))
+    
+def updateValidStocks(date):
+    deleteTickers = []
+    newStocks = []
+    for ticker in invalidStocks:
+        if int(stockStartDates[ticker])<=date:
+            validStocks.append(ticker)
+            deleteTickers.append(ticker)
+            newStocks.append(ticker)
+    for ticker in deleteTickers:
+        invalidStocks.remove(ticker)
+    return newStocks
+    
 def main():
+    updateValidStocks(START_DATE)
     print("Buy and hold ROI: ", runStrat(buyAndHold))
-    print("Moving average strategy ROI: ", runStrat(movingAverage))
+    print("EMA ROI: ", runStrat(EMA))
+    #print("Moving average strategy ROI: ", runStrat(movingAverage))
   
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
 def runStrat(strat):
     uninvested = 100_000
-    invested = 0
-    for day in range(1000, 2000):
-        invested = invested * aapl_list[day + 1] / aapl_list[day]
-        buyOrSell = strat(day, invested, uninvested)
-        invested = invested + buyOrSell
-        uninvested = uninvested - buyOrSell
+    invested = dict.fromkeys(validStocks, 0)
+    for day in range(1, 3000):
+        if day % STOCK_CHECK_INTERVAL == 0:
+            newStocks = updateValidStocks(dayList[day])
+            for ticker in newStocks:
+                invested[ticker] = 0
+        buysAndSells = strat(day, invested, uninvested)
+        for stock in invested:
+            dayShift = dayList.index(int(stockStartDates[stock]))
+            invested[stock] = invested[stock] * stocks[stock][day - dayShift] / stocks[stock][day-1-dayShift]  #changes stock value
+            invested[stock] = invested[stock] + buysAndSells[stock] #buys and sells
+        uninvested = uninvested - sum(buysAndSells.values())        
         #print("invested: $", invested," Uninvested: $", uninvested)
 
-    return (invested + uninvested) / 100_000
+    return sum(invested.values(), uninvested) / 100_000
 
 
 ##Keeps the portion of total funds invested proportional to the ratio between the 200 day
 ##and 50 day moving average.
 def movingAverage(day, invested, uninvested):
+    #THIS USES ONE STOCK
+    #MAKE IT NOR USE ONE STOCK
     k = 0.5
-    ratioOfAverages = getAverage(day, 50) / getAverage(day, 200)
+    ratioOfAverages = EMA(day, 50) / EMA(day, 200)
     #print("Ratio of Averages: ", ratioOfAverages)
     confidence = k * ratioOfAverages
     confidence = min(confidence, 1)
@@ -38,17 +76,35 @@ def movingAverage(day, invested, uninvested):
     return investmentTarget - invested
 
     
-##The simplest strategy, invests all capital                    
+##Distributes capital equally among all stocks                    
 def buyAndHold(day, invested, uninvested):
-    return uninvested
+        buysAndSells = copy.deepcopy(invested)
+        for stock in buysAndSells:
+            buysAndSells[stock] = uninvested / len(buysAndSells)
 
-def getAverage(day, interval):
-    if day - interval / 2 < 0:
-        print("Error: surrounding data not sufficient to calculate an average over this interval.")
+        return buysAndSells        
+
+    
+        
+def SMA(stock, day, interval):
+    if day - interval < 0:
+        print("Error: previous data not sufficient to calculate an average over this interval.")
         return None
     total = 0
-    for i in range(day - interval // 2, day + interval // 2):
-        total = total + aapl_list[i]
+    for i in range(day - interval, day):
+        total = total + stocks[stock][i]
     return total / interval
+
+def EMA(stock, day, interval):
+    if day - interval < 0:
+            print("Not enough previous data.")
+            return None
+    c = 2.0 / (interval + 1)
+    ema = SMA(stock, day - interval, interval)
+    for day in range(day - interval, day):
+        ema = (c * stocks[stock][day]) + ((1 - c) * ema)
+    return ema
+    
+  
 
 main()
