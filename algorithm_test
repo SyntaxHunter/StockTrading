@@ -2,12 +2,17 @@ import csv, copy
 from os import listdir
 fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
 START_DATE = 19980102
-STOCK_CHECK_INTERVAL = 30
+STOCK_CHECK_INTERVAL = 7
 stocks = {}
 validStocks = []
 invalidStocks = []
 stockStartDates = {}
 dayList = []
+
+aapl = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/table_aapl.csv', 'r'))
+for row in aapl:
+    dayList.append(int(row[0]))
+
 for fileName in fileNames:
     ticker = fileName.split('_')[1].split('.')[0]
     stock = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r'))
@@ -18,17 +23,16 @@ for fileName in fileNames:
     for day in stock:
         priceList.append(float(day[2]))
     stocks[ticker] = priceList
+    if len(stocks[ticker])<len(dayList):
+        for x in range(len(dayList)-len(stocks[ticker])):
+            stocks[ticker].insert(0,0)
     invalidStocks.append(ticker)
-    
-aapl = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/table_aapl.csv', 'r'))
-for row in aapl:
-    dayList.append(int(row[0]))
     
 def updateValidStocks(date):
     deleteTickers = []
     newStocks = []
     for ticker in invalidStocks:
-        if int(stockStartDates[ticker])<=date:
+        if int(stockStartDates[ticker])<date:
             validStocks.append(ticker)
             deleteTickers.append(ticker)
             newStocks.append(ticker)
@@ -44,6 +48,7 @@ def main():
   
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
 def runStrat(strat):
+    print(validStocks)
     uninvested = 100_000
     invested = dict.fromkeys(validStocks, 0)
     for day in range(1, 3000):
@@ -51,12 +56,11 @@ def runStrat(strat):
             newStocks = updateValidStocks(dayList[day])
             for ticker in newStocks:
                 invested[ticker] = 0
-        buysAndSells = strat(day, invested, uninvested)
         for stock in invested:
-            dayShift = dayList.index(int(stockStartDates[stock]))
-            invested[stock] = invested[stock] * stocks[stock][day - dayShift] / stocks[stock][day-1-dayShift]  #changes stock value
-            invested[stock] = invested[stock] + buysAndSells[stock] #buys and sells
-        uninvested = uninvested - sum(buysAndSells.values())        
+            invested[stock] = invested[stock] * stocks[stock][day] / stocks[stock][day-1]  #changes stock value
+            
+        #Buy and sell stocks
+        strat(day, invested, uninvested)
         #print("invested: $", invested," Uninvested: $", uninvested)
 
     return sum(invested.values(), uninvested) / 100_000
@@ -65,14 +69,15 @@ def runStrat(strat):
 ##Keeps the portion of total funds invested proportional to the ratio between the 200 day
 ##and 50 day moving average.
 def movingAverage(day, invested, uninvested):
-    #THIS USES ONE STOCK
-    #MAKE IT NOR USE ONE STOCK
-    k = 0.5
-    ratioOfAverages = EMA(day, 50) / EMA(day, 200)
-    #print("Ratio of Averages: ", ratioOfAverages)
-    confidence = k * ratioOfAverages
-    confidence = min(confidence, 1)
-    investmentTarget = confidence * (invested + uninvested)
+    goodStocks = {}
+    badStocks = {}
+    for stock in validStocks:
+        ratio = EMA(stock,day, 50)/EMA(day, 200)
+        if ratio > 1:
+            goodStocks[stock] = ratio
+        else:
+            badStocks[stock] = ratio
+    
     return investmentTarget - invested
 
     
@@ -96,8 +101,9 @@ def SMA(stock, day, interval):
     return total / interval
 
 def EMA(stock, day, interval):
-    if day - interval < 0:
-            print("Not enough previous data.")
+    #if currentDate -stockstartdate < interval, set interval = to difference
+    if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
+            interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
             return None
     c = 2.0 / (interval + 1)
     ema = SMA(stock, day - interval, interval)
