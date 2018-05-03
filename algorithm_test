@@ -89,7 +89,21 @@ def buyAndHold(day, invested, uninvested):
 
         return buysAndSells        
 
+   def EMAvsPrice(day, invested, uninvested):
+    goodStocks = {}
+    for stocks in validStocks:
+        dayShift = dayList.index(int(stockStartDates[stock]))
+        priceToEMA = stocks[stock][day - dayShift]] > EMA(stock, day - dayShift, 50)
+        if priceToEMA > 1:
+            goodStocks[stock] = priceToEMA
+    weightSum = sum(goodStocks.values())
+    totalFunds = uninvested = sum(invested.values())
+    for stock in invested:
+        invested[stock] = 0
+    for stock in goodStocks:
+        invested[stock] = totalFunds * goodStocks[stock] / weightSum
     
+
         
 def SMA(stock, day, interval):
     if day - interval < 0:
