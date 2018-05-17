@@ -1,54 +1,147 @@
-import csv
-aapl = open('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily/table_aapl.csv', 'r')
-reader = csv.reader(aapl)
-aapl_list = []
-for row in reader:
-    aapl_list.append(float(row[2]))
+import csv, copy
+from os import listdir
+fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
+START_DATE = 19980102
+STOCK_CHECK_INTERVAL = 7
+stocks = {}
+validStocks = []
+invalidStocks = []
+stockStartDates = {}
+dayList = []
+global uninvested
 
-##Simulates investment in Apple stock over the 1000 trading days
 
+aapl = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/table_aapl.csv', 'r'))
+for row in aapl:
+    dayList.append(int(row[0]))
+
+badStocks = []
+for fileName in fileNames:
+    
+    ticker = fileName.split('_')[1].split('.')[0]
+    stock = list(csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r')))
+    
+    stockDifference = len(stock) + dayList.index(int(stock[0][0]))
+    if stockDifference==3926:
+        priceList = []
+        stockStartDates[ticker] = int(stock[0][0])
+        
+        for day in stock:
+            priceList.append(float(day[2]))
+            
+        stocks[ticker] = priceList
+        if len(stocks[ticker]) < len(dayList):
+            for x in range(len(dayList) - len(stocks[ticker])):
+                stocks[ticker].insert(0,0)
+        invalidStocks.append(ticker)
+    
+
+    
+def updateValidStocks(date):
+    deleteTickers = []
+    newStocks = []
+    for ticker in invalidStocks:
+        if int(stockStartDates[ticker])<date:
+            validStocks.append(ticker)
+            deleteTickers.append(ticker)
+            newStocks.append(ticker)
+    for ticker in deleteTickers:
+        invalidStocks.remove(ticker)
+    return newStocks
 
 def main():
-    print("Buy and hold ROI: ", runStrat(buyAndHold))
+    updateValidStocks(dayList[dayList.index(START_DATE)+1])
+    #print("Buy and hold ROI: ", runStrat(buyAndHold))
     print("Moving average strategy ROI: ", runStrat(movingAverage))
   
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
 def runStrat(strat):
+    global uninvested
+    invested = dict.fromkeys(validStocks, 0)
     uninvested = 100_000
-    invested = 0
-    for day in range(1000, 2000):
-        invested = invested * aapl_list[day + 1] / aapl_list[day]
-        buyOrSell = strat(day, invested, uninvested)
-        invested = invested + buyOrSell
-        uninvested = uninvested - buyOrSell
-        #print("invested: $", invested," Uninvested: $", uninvested)
-
-    return (invested + uninvested) / 100_000
+    oldValue = uninvested
+    total = 0
+    for day in range(1, 3920):
+        if day % STOCK_CHECK_INTERVAL == 0:
+            newStocks = updateValidStocks(dayList[day])
+            for ticker in newStocks:
+                invested[ticker] = 0
+        if day%252==0:
+            total = total + sum(invested.values(), uninvested)/oldValue
+            oldValue = sum(invested.values(), uninvested)
+        for stock in invested:
+            invested[stock] = invested[stock] * stocks[stock][day] / stocks[stock][day-1]  #changes stock value
+            
+        #Buy and sell stocks
+        strat(day, invested)
+    print("Average (mean) growth per year:", total/15)
+    return sum(invested.values(), uninvested) / 100_000
 
 
 ##Keeps the portion of total funds invested proportional to the ratio between the 200 day
 ##and 50 day moving average.
-def movingAverage(day, invested, uninvested):
-    k = 0.5
-    ratioOfAverages = getAverage(day, 50) / getAverage(day, 200)
-    #print("Ratio of Averages: ", ratioOfAverages)
-    confidence = k * ratioOfAverages
-    confidence = min(confidence, 1)
-    investmentTarget = confidence * (invested + uninvested)
-    return investmentTarget - invested
+def movingAverage(day, invested):
+    global uninvested
+    goodStocks = {}
+    badStocks = {}
+    for stock in validStocks:
+        ratio = EMA(stock,day, 50)/EMA(stock,day, 200)
+        if ratio > 1:
+            goodStocks[stock] = ratio
+        else:
+            badStocks[stock] = ratio
+    for stock in badStocks.keys():
+        uninvested += invested[stock]
+        invested[stock] = 0
+    for stock in goodStocks.keys():
+        ratioTotal = goodStocks[stock]
+        uninvested += invested[stock]
+        invested[stock] = 0
+    uninvestedBeforePurchases = uninvested
+    for stock in goodStocks.keys():
+        invested[stock] = uninvestedBeforePurchases * (goodStocks[stock]/ratioTotal)
 
     
-##The simplest strategy, invests all capital                    
-def buyAndHold(day, invested, uninvested):
-    return uninvested
+##Distributes capital equally among all stocks                    
+def buyAndHold(day, invested):
+    global uninvested
+    #totalFunds = sum(invested.values(), uninvested)
+    if uninvested>0:
+        for stock in validStocks:
+            invested[stock] = uninvested/len(validStocks)
+    uninvested = 0
 
-def getAverage(day, interval):
-    if day - interval / 2 < 0:
-        print("Error: surrounding data not sufficient to calculate an average over this interval.")
-        return None
+def EMAvsPrice(day, invested, uninvested):
+    goodStocks = {}
+    for stocks in validStocks:
+        dayShift = dayList.index(int(stockStartDates[stock]))
+        priceToEMA = stocks[stock][day - dayShift] > EMA(stock, day - dayShift, 50)
+        if priceToEMA > 1:
+            goodStocks[stock] = priceToEMA
+    weightSum = sum(goodStocks.values())
+    totalFunds = uninvested + sum(invested.values())
+    for stock in invested:
+        invested[stock] = 0
+    for stock in goodStocks:
+        invested[stock] = totalFunds * goodStocks[stock] / weightSum   
+        
+def SMA(stock, day, interval):
+    if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
+        interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
     total = 0
-    for i in range(day - interval // 2, day + interval // 2):
-        total = total + aapl_list[i]
+    for i in range(day - interval, day):
+        total = total + stocks[stock][i]
     return total / interval
+
+def EMA(stock, day, interval):
+    if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
+        interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
+    c = 2.0 / (interval + 1)
+    ema = SMA(stock, day, interval)
+    for day in range(day - interval, day):
+        ema = (c * stocks[stock][day]) + ((1 - c) * ema)
+    return ema
+    
+  
 
 main()
