@@ -1,6 +1,6 @@
 import csv, copy
 from os import listdir
-fileNames = listdir('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily')
+fileNames = listdir('C:/Users/jake.stenger.19/Desktop/daily')
 START_DATE = 19980102
 STOCK_CHECK_INTERVAL = 7
 stocks = {}
@@ -11,7 +11,7 @@ dayList = []
 global uninvested
 
 
-aapl = csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/table_aapl.csv', 'r'))
+aapl = csv.reader(open('C:/Users/jake.stenger.19/Desktop/daily/table_aapl.csv', 'r'))
 for row in aapl:
     dayList.append(int(row[0]))
 
@@ -19,7 +19,7 @@ badStocks = []
 for fileName in fileNames:
     
     ticker = fileName.split('_')[1].split('.')[0]
-    stock = list(csv.reader(open('C:/Users/thomas.sottosanti.20/Algorithmic Trading/daily/' + fileName, 'r')))
+    stock = list(csv.reader(open('C:/Users/jake.stenger.19/Desktop/daily/' + fileName, 'r')))
     
     stockDifference = len(stock) + dayList.index(int(stock[0][0]))
     if stockDifference==3926:
@@ -74,6 +74,7 @@ def runStrat(strat):
             
         #Buy and sell stocks
         strat(day, invested)
+        print(day, sum(invested.values()))
     print("Average (mean) growth per year:", total/15)
     return sum(invested.values(), uninvested) / 100_000
 
@@ -86,20 +87,26 @@ def movingAverage(day, invested):
     badStocks = {}
     for stock in validStocks:
         ratio = EMA(stock,day, 50)/EMA(stock,day, 200)
-        if ratio > 1:
+        if ratio > 1.3:
             goodStocks[stock] = ratio
         else:
             badStocks[stock] = ratio
+    print(len(goodStocks))
     for stock in badStocks.keys():
         uninvested += invested[stock]
         invested[stock] = 0
+    ratioTotal = 0
     for stock in goodStocks.keys():
-        ratioTotal = goodStocks[stock]
+        ratioTotal += goodStocks[stock]
         uninvested += invested[stock]
         invested[stock] = 0
     uninvestedBeforePurchases = uninvested
+    boughtStocks = False
     for stock in goodStocks.keys():
+        boughtStocks = True
         invested[stock] = uninvestedBeforePurchases * (goodStocks[stock]/ratioTotal)
+    if boughtStocks:
+        uninvested = 0
 
     
 ##Distributes capital equally among all stocks                    
