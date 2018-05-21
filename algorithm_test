@@ -1,8 +1,8 @@
-import csv, copy
+import csv, copy, math
 from os import listdir
 fileNames = listdir('C:/Users/jake.stenger.19/Desktop/daily')
 START_DATE = 19980102
-STOCK_CHECK_INTERVAL = 7
+STOCK_CHECK_INTERVAL = 100
 stocks = {}
 validStocks = []
 invalidStocks = []
@@ -15,9 +15,7 @@ aapl = csv.reader(open('C:/Users/jake.stenger.19/Desktop/daily/table_aapl.csv', 
 for row in aapl:
     dayList.append(int(row[0]))
 
-badStocks = []
 for fileName in fileNames:
-    
     ticker = fileName.split('_')[1].split('.')[0]
     stock = list(csv.reader(open('C:/Users/jake.stenger.19/Desktop/daily/' + fileName, 'r')))
     
@@ -66,16 +64,13 @@ def runStrat(strat):
             newStocks = updateValidStocks(dayList[day])
             for ticker in newStocks:
                 invested[ticker] = 0
-        if day%252==0:
-            total = total + sum(invested.values(), uninvested)/oldValue
-            oldValue = sum(invested.values(), uninvested)
-        for stock in invested:
-            invested[stock] = invested[stock] * stocks[stock][day] / stocks[stock][day-1]  #changes stock value
-            
         #Buy and sell stocks
         strat(day, invested)
+        for stock in invested:
+            invested[stock] = invested[stock] * (stocks[stock][day] / stocks[stock][day-1])  #changes stock value
+
         print(day, sum(invested.values()))
-    print("Average (mean) growth per year:", total/15)
+    print("Average (mean) growth per year:", math.pow((sum(invested.values())+uninvested)/100000, 1/15))
     return sum(invested.values(), uninvested) / 100_000
 
 
@@ -87,11 +82,11 @@ def movingAverage(day, invested):
     badStocks = {}
     for stock in validStocks:
         ratio = EMA(stock,day, 50)/EMA(stock,day, 200)
-        if ratio > 1.3:
+        if ratio > 1.4:
             goodStocks[stock] = ratio
         else:
             badStocks[stock] = ratio
-    print(len(goodStocks))
+    
     for stock in badStocks.keys():
         uninvested += invested[stock]
         invested[stock] = 0
@@ -106,32 +101,17 @@ def movingAverage(day, invested):
         boughtStocks = True
         invested[stock] = uninvestedBeforePurchases * (goodStocks[stock]/ratioTotal)
     if boughtStocks:
+        print(max(goodStocks, key = goodStocks.get))
         uninvested = 0
 
-    
 ##Distributes capital equally among all stocks                    
 def buyAndHold(day, invested):
     global uninvested
-    #totalFunds = sum(invested.values(), uninvested)
     if uninvested>0:
         for stock in validStocks:
             invested[stock] = uninvested/len(validStocks)
     uninvested = 0
 
-def EMAvsPrice(day, invested, uninvested):
-    goodStocks = {}
-    for stocks in validStocks:
-        dayShift = dayList.index(int(stockStartDates[stock]))
-        priceToEMA = stocks[stock][day - dayShift] > EMA(stock, day - dayShift, 50)
-        if priceToEMA > 1:
-            goodStocks[stock] = priceToEMA
-    weightSum = sum(goodStocks.values())
-    totalFunds = uninvested + sum(invested.values())
-    for stock in invested:
-        invested[stock] = 0
-    for stock in goodStocks:
-        invested[stock] = totalFunds * goodStocks[stock] / weightSum   
-        
 def SMA(stock, day, interval):
     if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
         interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
@@ -149,6 +129,4 @@ def EMA(stock, day, interval):
         ema = (c * stocks[stock][day]) + ((1 - c) * ema)
     return ema
     
-  
-
 main()
