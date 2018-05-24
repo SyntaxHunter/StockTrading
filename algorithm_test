@@ -82,7 +82,7 @@ def movingAverage(day, invested):
     badStocks = {}
     for stock in validStocks:
         ratio = EMA(stock,day, 50)/EMA(stock,day, 200)
-        if ratio > 1.4:
+        if ratio > 1.34:
             goodStocks[stock] = ratio
         else:
             badStocks[stock] = ratio
