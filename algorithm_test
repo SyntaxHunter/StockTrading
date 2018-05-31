@@ -1,138 +1,192 @@
-Skip to content
- 
-Search or jump to…
+import csv, copy
+from os import listdir
+import json
+import math
+stockInfoDir = 'C:/Users/jake.stenger.19/Desktop/daily/'
+fileNames = listdir(stockInfoDir)
+START_DATE = 19980102
+STOCK_CHECK_INTERVAL = 7
+stocks = {}
+validStocks = []
+invalidStocks = []
+stockStartDates = {}
+dayList = []
+outstandingShares = {}
+marketValues = {}
+global uninvested
 
-Pull requests
-Issues
-Marketplace
-Explore
- @jsteng19
-Sign out
-0
-1 0 SyntaxHunter/StockTrading
- Code  Issues 0  Pull requests 0  Projects 0  Wiki  Insights
-StockTrading/ 
-algorithm_test
-  or cancel
-    
- 
-1
-import csv
-2
-aapl = open('/Users/jstenger/Downloads/quantquote_daily_sp500_83986/daily/table_aapl.csv', 'r')
-3
-reader = csv.reader(aapl)
-4
-aapl_list = []
-5
-for row in reader:
-6
-    aapl_list.append(float(row[2]))
-7
-​
-8
-##Simulates investment in Apple stock over the 1000 trading days
-9
-​
-10
-​
-11
+f = open('C:/Users/jake.stenger.19/Downloads/outstandingShares.txt', 'r')
+outstandingShares = json.loads(f.read())
+
+stockStartDates["outstandingShares"] = START_DATE
+
+aapl = csv.reader(open(stockInfoDir + 'table_aapl.csv', 'r'))
+for row in aapl:
+    dayList.append(int(row[0]))
+
+for fileName in fileNames:
+    ticker = fileName.split('_')[1].split('.')[0]
+    stock = list(csv.reader(open(stockInfoDir + fileName, 'r')))
+
+    stockDifference = len(stock) + dayList.index(int(stock[0][0]))
+    if stockDifference==3926:
+        priceList = []
+        stockStartDates[ticker] = int(stock[0][0])
+
+        for day in stock:
+            priceList.append(float(day[2]))
+
+        stocks[ticker] = priceList
+        if len(stocks[ticker]) < len(dayList):
+            for x in range(len(dayList) - len(stocks[ticker])):
+                stocks[ticker].insert(0,0)
+        invalidStocks.append(ticker)
+
+def updateValidStocks(date):
+    deleteTickers = []
+    newStocks = []
+    for ticker in invalidStocks:
+        if int(stockStartDates[ticker])<date:
+            validStocks.append(ticker)
+            deleteTickers.append(ticker)
+            newStocks.append(ticker)
+    for ticker in deleteTickers:
+        invalidStocks.remove(ticker)
+    return newStocks
+
 def main():
-12
-    print("Buy and hold ROI: ", runStrat(buyAndHold))
-13
+    updateValidStocks(dayList[dayList.index(START_DATE)+1])
+##    #print("Buy and hold ROI: ", runStrat(buyAndHold))
     print("Moving average strategy ROI: ", runStrat(movingAverage))
-14
-  
-15
+##    totalV = 0
+##    count = 0
+##    for day in range (1, 3920):
+##        print(day)
+##        if day % STOCK_CHECK_INTERVAL == 0:
+##            newStocks = updateValidStocks(dayList[day])
+##        for stock in validStocks:
+##            totalV += stockVolatility(stock, day)
+##            count += 1 
+##
+##    print(totalV / count)
+
 ##runs the strategy strat over 1000 days, returns final stats: (invested, uninvested, ROI)
-16
 def runStrat(strat):
-17
+    global uninvested
+    invested = dict.fromkeys(validStocks, 0)
     uninvested = 100_000
-18
-    invested = 0
-19
-    for day in range(1000, 2000):
-20
-        invested = invested * aapl_list[day + 1] / aapl_list[day]
-21
-        buyOrSell = strat(day, invested, uninvested)
-22
-        invested = invested + buyOrSell
-23
-        uninvested = uninvested - buyOrSell
-24
-        #print("invested: $", invested," Uninvested: $", uninvested)
-25
-​
-26
-    return (invested + uninvested) / 100_000
-27
-​
-28
-​
-29
-##Keeps the portion of total funds invested proportional to the ratio between the 200 day
-30
-##and 50 day moving average.
-31
-def movingAverage(day, invested, uninvested):
-32
-    k = 0.5
-33
-    ratioOfAverages = getAverage(day, 50) / getAverage(day, 200)
-34
-    #print("Ratio of Averages: ", ratioOfAverages)
-35
-    confidence = k * ratioOfAverages
-36
-    confidence = min(confidence, 1)
-37
-    investmentTarget = confidence * (invested + uninvested)
-38
-    return investmentTarget - invested
-39
-​
-40
-    
-41
-##The simplest strategy, invests all capital                    
-42
-def buyAndHold(day, invested, uninvested):
-43
-    return uninvested
-44
-​
-45
-def getAverage(day, interval):
-46
-    if day - interval / 2 < 0:
-47
-        print("Error: surrounding data not sufficient to calculate an average over this interval.")
-48
-        return None
-49
+    oldValue = uninvested
     total = 0
-@jsteng19
-Commit changes
+    for day in range(1, 3920):
+        if day % STOCK_CHECK_INTERVAL == 0:
+            newStocks = updateValidStocks(dayList[day])
+            for ticker in newStocks:
+                invested[ticker] = 0
+        #Buy and sell stocks
+        strat(day, invested)
+        for stock in invested:
+            invested[stock] = invested[stock] * (stocks[stock][day] / stocks[stock][day-1])  #changes stock value
 
-Update algorithm_test
+        print(day, sum(invested.values()))
+    print("Average (mean) growth per year:", math.pow((sum(invested.values())+uninvested)/100000, 1/15))
+    return sum(invested.values(), uninvested) / 100_000
 
-Add an optional extended description…
-  Commit directly to the 5/30-in-pro branch.
-  Create a new branch for this commit and start a pull request. Learn more about pull requests.
- 
-© 2018 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-API
-Training
-Shop
-Blog
-About
-Press h to open a hovercard with more details.
+##Keeps the portion of total funds invested proportional to the ratio between the 200 day
+##and 50 day moving average.
+def movingAverage(day, invested):
+    global uninvested
+    goodStocks = {}
+    badStocks = {}
+    for stock in validStocks:
+        ratio = EMA(stock,day, 50)/SMA(stock,day, 200)
+        threshold = 1.36 - .1*math.log(stockVolatility(stock, day))
+        if threshold > 1.43:
+            threshold = 1.43
+        if ratio > 1.33:
+            goodStocks[stock] = ratio
+        else:
+            badStocks[stock] = ratio
+
+    for stock in badStocks.keys():
+        uninvested += invested[stock]
+        invested[stock] = 0
+    ratioTotal = 0
+    for stock in goodStocks.keys():
+        ratioTotal += goodStocks[stock]
+        uninvested += invested[stock]
+        invested[stock] = 0
+    uninvestedBeforePurchases = uninvested
+    boughtStocks = False
+    for stock in goodStocks.keys():
+        boughtStocks = True
+        invested[stock] = uninvestedBeforePurchases * (goodStocks[stock]/ratioTotal)
+    if boughtStocks:
+        print(max(goodStocks, key = goodStocks.get))
+        uninvested = 0
+
+##Distributes capital equally among all stocks
+def buyAndHold(day, invested):
+    global uninvested
+    if uninvested>0:
+        for stock in validStocks:
+            invested[stock] = uninvested/len(validStocks)
+    uninvested = 0
+
+def EMA(stock, day, interval):
+    if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
+        interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
+    c = 2.0 / (interval + 1)
+    ema = SMA(stock, day, interval)
+    for day in range(day - interval, day):
+        ema = (c * stocks[stock][day]) + ((1 - c) * ema)
+    return ema
+
+def SMA(stock, day, interval):
+    if dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock]) < interval:
+        interval = dayList.index(START_DATE)+day-dayList.index(stockStartDates[stock])
+    total = 0
+    for i in range(day - interval, day):
+        total = total + stocks[stock][i]
+    return total / interval
+
+def calcMarketValues(start = 0, useableStocks = validStocks):
+
+    # only assign outstandingShares to 0 if not initalized
+    if not ("outstandingShares" in stocks.keys()):
+        stocks["outstandingShares"] = [0 for i in range(len(dayList))]
+
+    # read through each valid stock
+    for stock in useableStocks:
+
+        # add each stock's am values multiplied by the volume
+        # to the market value for a given range of time
+
+        for i in range(start,3920):
+            stocks["outstandingShares"][i] += float(stocks[stock][i]) * outstandingShares[stock]
+
+def stockVolatility(ticker, day, days = 100):
+    # returns if stock does not have enough days of info
+    if(day < days):
+        return 1;
+
+    # calculate the average price for each day (am is used)
+    average = 0
+    for i in range(day - days,  day):
+        average += float(stocks[ticker][i])
+    average /= days
+
+        # determine each period's deviation, square it, and add them all
+    deviations = 0
+    count = 0
+    for i in range(day - days, day):
+        deviations += pow(float(stocks[ticker][i]) - average, 2)
+        count += 1
+
+    # standard deviation is equal to
+    # the square root of the sum divided by the number of days
+    standardDev = math.sqrt(deviations / days)
+
+    # return standard deviation as value for volatility
+    return standardDev
+
+main()
