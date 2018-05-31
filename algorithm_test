@@ -136,67 +136,45 @@ def SMA(stock, day, interval):
         total = total + stocks[stock][i]
     return total / interval
 
-def calcMarketValues():
+def calcMarketValues(start = 0, useableStocks = validStocks):
 
-    mValues = [0 for i in range(len(dayList))]
+    # only assign outstandingShares to 0 if not initalized
+    if not ("outstandingShares" in stocks.keys()):
+        stocks["outstandingShares"] = [0 for i in range(len(dayList))]
 
     # read through each valid stock
-    for fileName in fileNames:
-        key = fileName.split('_')[1].split('.')[0]
-        currentStock = list(csv.reader(open(stockInfoDir + 'table_' + key + '.csv', 'r')))
-
-        # find where start date occurs in stock list
-        row = 0
-        while(int(currentStock[row][0]) < START_DATE):
-            row += 1
+    for stock in useableStocks:
 
         # add each stock's am values multiplied by the volume
         # to the market value for a given range of time
 
-        i = row
+        for i in range(start,3920):
+            stocks["outstandingShares"][i] += float(stocks[stock][i]) * outstandingShares[stock]
 
-        # infinite loop - appending same thing
-        while (i < row + 3000 and row < len(currentStock)):
-            stockRow = currentStock[i]
-            # if(stockRow[0] in mValues.keys()):
-            mValues[dayList.index(int(stockRow[0]))] += float(stockRow[2]) * outstandingShares[key]
-            # else:
-            #     print("Error")
-            #     mValues[stockRow[0]] = float(stockRow[2]) * outstandingShares[key]
-            row += 1
-
-    stocks["outstandingShares"] = mValues
-
-def stockVolatility(stock, date, days = 100):
-    # find where start date occurs in stock list
-    row = 0
-    while(int(stock[row][0]) < START_DATE):
-        row += 1
-
-    # prints out error if stock does not have enough days of info
-    if(row > days):
-        print("ERROR: stock has fewer days than requested")
-        return;
+def stockVolatility(ticker, day, days = 100):
+    # returns if stock does not have enough days of info
+    if(day < days):
+        return 0;
 
     # calculate the average price for each day (am is used)
     average = 0
-    for i in range(row - days + 1, row + 1):
-        average += float(stock[i][2])
+    for i in range(day - days,  day):
+        average += float(stocks[ticker][i])
     average /= days
 
-    # determine each period's deviation, square it, and add them all
-    deviations = 0
-    count = 0
-    for i in range(row - days + 1, row + 1):
-        deviations += pow(float(stock[i][2]) - average, 2)
-        count += 1
+        # determine each period's deviation, square it, and add them all
+        deviations = 0
+        count = 0
+        for i in range(day - days, day):
+            deviations += pow(float(stocks[ticker][i]) - average, 2)
+            count += 1
 
-    # standard deviation is equal to
-    # the square root of the sum divided by the number of days
-    standardDev = sqrt(deviations / days)
+        # standard deviation is equal to
+        # the square root of the sum divided by the number of days
+        standardDev = sqrt(deviations / days)
 
-    # return standard deviation as value for volatility
-    return standardDev
+        # return standard deviation as value for volatility
+        return standardDev
 
 calcMarketValues()
 main()
